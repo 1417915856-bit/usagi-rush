@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>乌萨奇大暴走 - 最终版</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Arial', sans-serif; user-select: none; }
+        
+        /* 按钮通用样式 */
+        .btn {
+            background: #ff6b81; color: white; border: none;
+            padding: 12px 30px; border-radius: 50px; 
+            font-size: 20px; cursor: pointer; font-weight: bold;
+            box-shadow: 0 4px 0 #d63031; transition: transform 0.1s;
+            min-width: 160px;
+        }
+        .btn:active { transform: translateY(4px); box-shadow: 0 0 0 #d63031; }
+        .btn:hover { background: #ff4757; }
+        
+        .btn-secondary { background: #74b9ff; box-shadow: 0 4px 0 #0984e3; }
+        .btn-secondary:active { box-shadow: 0 0 0 #0984e3; }
+        .btn-secondary:hover { background: #0984e3; }
+
+        /* 1. 开始界面 */
+        #start-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #81ecec 0%, #74b9ff 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100;
+        }
+        h1 { font-size: 60px; color: #fff; text-shadow: 3px 3px 0 #000; margin-bottom: 20px; text-align: center;}
+        
+        #high-score-display {
+            font-size: 28px; color: #ffeaa7; font-weight: bold;
+            text-shadow: 2px 2px 0 #d63031;
+            margin-bottom: 40px; border: 2px dashed #fff;
+            padding: 10px 30px; border-radius: 15px;
+            background: rgba(0,0,0,0.1);
+        }
+
+        /* 规则弹窗 */
+        #rules-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 320px; background: white; padding: 25px; border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center;
+            display: none; z-index: 101;
+        }
+
+        /* 2. 游戏内 UI */
+        #game-ui {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: none; 
+        }
+        #score-board { 
+            position: absolute; top: 20px; left: 20px;
+            font-size: 36px; color: #333; font-weight: bold; 
+            text-shadow: 2px 2px 0px #fff; 
+        }
+        #controls-top-right {
+            position: absolute; top: 20px; right: 20px;
+            pointer-events: auto;
+        }
+        .icon-btn {
+            width: 60px; height: 60px; border-radius: 50%;
+            border: 4px solid #fff; cursor: pointer;
+            font-size: 28px; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            background: #ff6b81; color: white; transition: transform 0.1s;
+        }
+        .icon-btn:hover { transform: scale(1.1); }
+        .icon-btn:active { transform: scale(0.95); }
+
+        /* 3. 暂停菜单 */
+        #pause-menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 200; 
+        }
+        #pause-menu h2 { font-size: 50px; color: white; text-shadow: 2px 2px 0 #000; margin-bottom: 40px; }
+        .menu-container { display: flex; flex-direction: column; gap: 20px; }
+
+        /* 4. 结算界面 */
+        #game-over {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none; pointer-events: auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 90;
+        }
+        
+        #loading {
+            position: absolute; bottom: 20px; width: 100%; text-align: center;
+            font-size: 18px; color: #fff;
+        }
+
+        /* 漂浮文字动画 */
+        .floating-text {
+            position: absolute;
+            color: #ffeaa7; font-weight: bold; font-size: 24px;
+            text-shadow: 1px 1px 0 #d63031;
+            pointer-events: none;
+            animation: floatUp 1s ease-out forwards;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+        
+        /* 手机端触屏提示 */
+        #touch-hint {
+            position: absolute; bottom: 80px; width: 100%; text-align: center;
+            color: rgba(255,255,255,0.5); font-size: 14px; pointer-events: none;
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1>🐰 乌萨奇大暴走</h1>
+        <div id="high-score-display">🏆 历史最高分: 0</div>
+        
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;">
+            <button class="btn" id="btn-start">开始暴走</button>
+            <button class="btn btn-secondary" id="btn-rules">游戏说明</button>
+        </div>
+        <div id="loading">正在召唤乌萨奇...</div>
+    </div>
+
+    <div id="rules-modal">
+        <h3 style="margin-top:0;">📖 玩法说明</h3>
+        <p style="text-align: left; line-height: 1.8; font-size: 16px;">
+            💻 <strong>电脑：</strong> 按 ← → 或 A D 移动<br>
+            📱 <strong>手机：</strong> 点击屏幕左/右侧移动<br>
+            🧱 <strong>目标：</strong> 躲避红色方块<br>
+            ⭐ <strong>加分：</strong> 收集黄色金币<br>
+        </p>
+        <button class="btn btn-secondary" onclick="document.getElementById('rules-modal').style.display='none'" style="width:100%">懂了</button>
+    </div>
+
+    <div id="game-ui">
+        <div id="score-board">SCORE: 0</div>
+        <div id="controls-top-right">
+            <button class="icon-btn" id="btn-pause" title="暂停游戏">⏸</button>
+        </div>
+        <div id="floating-layer" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
+        <div id="touch-hint">点击屏幕两侧移动</div>
+    </div>
+
+    <div id="pause-menu">
+        <h2>已暂停</h2>
+        <div class="menu-container">
+            <button class="btn" id="btn-continue">▶ 继续游戏</button>
+            <button class="btn btn-secondary" id="btn-restart-menu">🔄 重新开始</button>
+            <button class="btn btn-secondary" id="btn-home" style="background: #a29bfe;">🏠 返回主菜单</button>
+        </div>
+    </div>
+
+    <div id="game-over">
+        <h1 id="game-over-title" style="color: #ff4757; margin: 0; font-size: 40px;">乌萨奇翻车了!</h1>
+        <p id="final-score" style="font-size: 24px; margin: 20px 0;">得分: 0</p>
+        <div style="display: flex; gap: 15px; justify-content: center;">
+            <button class="btn" onclick="resetGame()">再来一次</button>
+            <button class="btn btn-secondary" onclick="goHome()">回主页</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        let gameState = 'MENU'; 
+        let score = 0;
+        let speed = 0.1;
+        let targetX = 0;
+        let shakeIntensity = 0; // 震动强度
+
+        let highScore = localStorage.getItem('usagi_high_score') || 0;
+        document.getElementById('high-score-display').innerText = "🏆 历史最高分: " + highScore;
+
+        // 纹理生成
+        function createFloorTexture() {
+            const size = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const context = canvas.getContext('2d');
+            context.fillStyle = '#66bb6a'; context.fillRect(0, 0, size, size);
+            context.fillStyle = '#81c784';
+            context.fillRect(0, 0, size/2, size/2);
+            context.fillRect(size/2, size/2, size/2, size/2);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping; texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(20, 20); texture.anisotropy = 16; 
+            return texture;
+        }
+        const floorTexture = createFloorTexture();
+
+        function createParticleTexture() {
+            const size = 64;
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const context = canvas.getContext('2d');
+            const gradient = context.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            context.fillStyle = gradient; context.fillRect(0, 0, size, size);
+            return new THREE.CanvasTexture(canvas);
+        }
+        const particleTexture = createParticleTexture();
+
+        function createSkyTexture() {
+            const size = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const context = canvas.getContext('2d');
+            const gradient = context.createLinearGradient(0, 0, 0, 512);
+            gradient.addColorStop(0, '#87CEEB'); gradient.addColorStop(1, '#E0F7FA'); 
+            context.fillStyle = gradient; context.fillRect(0, 0, 512, 512);
+            return new THREE.CanvasTexture(canvas);
+        }
+        const skyTexture = createSkyTexture();
+
+        const scene = new THREE.Scene();
+        scene.background = skyTexture; 
+        scene.fog = new THREE.Fog(0xE0F7FA, 10, 50);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+        const originalCameraPos = { x: 0, y: 4, z: 8 };
+        camera.position.set(originalCameraPos.x, originalCameraPos.y, originalCameraPos.z);
+        camera.lookAt(0, 0, -5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2); 
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true; scene.add(dirLight);
+
+        const floorGeometry = new THREE.PlaneGeometry(200, 200);
+        const floorMaterial = new THREE.MeshPhongMaterial({ map: floorTexture });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+        scene.add(floor);
+
+        const playerGroup = new THREE.Group();
+        scene.add(playerGroup);
+        
+        let obstacles = [];
+        let coins = [];
+        let particles = [];
+        let explosionParticles = [];
+
+        const loader = new GLTFLoader();
+        loader.load('model.glb', function (gltf) {
+            const model = gltf.scene;
+            model.scale.set(1.5, 1.5, 1.5); 
+            // 🔒 锁定正确朝向
+            model.rotation.y = Math.PI; 
+            model.traverse(obj => { if (obj.isMesh) obj.castShadow = true; });
+            playerGroup.add(model);
+            document.getElementById('loading').style.display = 'none';
+        }, undefined, function (error) {
+            document.getElementById('loading').innerText = "模型加载失败";
+        });
+
+        function startGame() {
+            if (playerGroup.children.length === 0) {
+                alert("模型加载中..."); return;
+            }
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'block';
+            resetGameData();
+            gameState = 'PLAYING';
+            animate();
+        }
+
+        function pauseGame() {
+            if (gameState === 'PLAYING') {
+                gameState = 'PAUSED';
+                document.getElementById('pause-menu').style.display = 'flex';
+            }
+        }
+
+        function resumeGame() {
+            if (gameState === 'PAUSED') {
+                gameState = 'PLAYING';
+                document.getElementById('pause-menu').style.display = 'none';
+            }
+        }
+
+        window.goHome = function() {
+            document.getElementById('pause-menu').style.display = 'none';
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+            document.getElementById('high-score-display').innerText = "🏆 历史最高分: " + highScore;
+            resetGameData();
+            gameState = 'MENU';
+        }
+
+        window.resetGame = function() {
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('pause-menu').style.display = 'none';
+            resetGameData();
+            gameState = 'PLAYING';
+        }
+
+        function resetGameData() {
+            score = 0;
+            speed = 0.1;
+            targetX = 0;
+            shakeIntensity = 0;
+            playerGroup.position.set(0, 0, 0);
+            camera.position.set(originalCameraPos.x, originalCameraPos.y, originalCameraPos.z);
+            if (playerGroup.children.length > 0) playerGroup.children[0].rotation.x = 0;
+
+            obstacles.forEach(obj => scene.remove(obj));
+            coins.forEach(obj => scene.remove(obj));
+            particles.forEach(p => scene.remove(p));
+            explosionParticles.forEach(p => scene.remove(p));
+            
+            obstacles = []; coins = []; particles = []; explosionParticles = [];
+
+            document.getElementById('floating-layer').innerHTML = '';
+            document.getElementById('score-board').innerText = "SCORE: 0";
+        }
+
+        function spawnObject() {
+            if (gameState !== 'PLAYING') return;
+            const isObstacle = Math.random() > 0.3;
+            const lane = (Math.floor(Math.random() * 3) - 1) * 2;
+
+            if (isObstacle) {
+                const geo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+                const mat = new THREE.MeshPhongMaterial({ color: 0xff4757 });
+                const obs = new THREE.Mesh(geo, mat);
+                obs.castShadow = true;
+                obs.position.set(lane, 0.4, -40);
+                obs.userData = { rotationSpeed: Math.random() * 0.1 };
+                scene.add(obs);
+                obstacles.push(obs);
+            } else {
+                const geo = new THREE.OctahedronGeometry(0.4);
+                const mat = new THREE.MeshPhongMaterial({ color: 0xffd700, emissive: 0xaa6600 });
+                const coin = new THREE.Mesh(geo, mat);
+                coin.position.set(lane, 0.6, -40);
+                scene.add(coin);
+                coins.push(coin);
+            }
+        }
+        setInterval(spawnObject, 800);
+        setInterval(() => { if (gameState === 'PLAYING') speed += 0.02; }, 5000);
+
+        function spawnDust() {
+            if (gameState !== 'PLAYING') return;
+            const geo = new THREE.PlaneGeometry(0.4, 0.4);
+            const mat = new THREE.MeshBasicMaterial({ 
+                map: particleTexture, transparent: true, opacity: 0.8, depthWrite: false 
+            });
+            const p = new THREE.Mesh(geo, mat);
+            p.position.set(
+                playerGroup.position.x + (Math.random() * 0.4 - 0.2), 
+                0.1, 
+                playerGroup.position.z + 0.5 
+            );
+            p.rotation.x = -Math.PI / 2;
+            scene.add(p);
+            particles.push(p);
+        }
+
+        function triggerCoinExplosion(position) {
+            for (let i = 0; i < 15; i++) {
+                const geo = new THREE.PlaneGeometry(0.2, 0.2);
+                const mat = new THREE.MeshBasicMaterial({ color: 0xffd700, side: THREE.DoubleSide });
+                const p = new THREE.Mesh(geo, mat);
+                p.position.copy(position);
+                p.userData = {
+                    velX: (Math.random() - 0.5) * 0.2,
+                    velY: (Math.random()) * 0.2 + 0.1,
+                    velZ: (Math.random() - 0.5) * 0.2,
+                    rotVel: (Math.random() - 0.5) * 0.2
+                };
+                scene.add(p);
+                explosionParticles.push(p);
+            }
+        }
+
+        function showFloatingText(text) {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.innerText = text;
+            el.style.left = '50%'; el.style.top = '40%';
+            el.style.transform = 'translate(-50%, -50%)';
+            document.getElementById('floating-layer').appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        function checkCollision(obj1, obj2) {
+            const dx = Math.abs(obj1.position.x - obj2.position.x);
+            const dz = Math.abs(obj1.position.z - obj2.position.z);
+            return dx < 0.8 && dz < 1.0;
+        }
+
+        document.getElementById('btn-start').addEventListener('click', startGame);
+        document.getElementById('btn-rules').addEventListener('click', () => { document.getElementById('rules-modal').style.display = 'block'; });
+        document.getElementById('btn-pause').addEventListener('click', (e) => { e.target.blur(); pauseGame(); });
+        document.getElementById('btn-continue').addEventListener('click', resumeGame);
+        document.getElementById('btn-restart-menu').addEventListener('click', resetGame);
+        document.getElementById('btn-home').addEventListener('click', goHome);
+
+        // 键盘控制
+        document.addEventListener('keydown', (event) => {
+            if (gameState !== 'PLAYING') return;
+            const key = event.key.toLowerCase();
+            if (key === 'a' || key === 'arrowleft') targetX = Math.max(targetX - 2, -2);
+            if (key === 'd' || key === 'arrowright') targetX = Math.min(targetX + 2, 2);
+            if (key === 'escape') pauseGame();
+        });
+
+        // 📱 手机触屏控制
+        document.addEventListener('touchstart', (event) => {
+            if (gameState !== 'PLAYING') return;
+            const touchX = event.touches[0].clientX;
+            const screenWidth = window.innerWidth;
+            if (touchX < screenWidth / 2) targetX = Math.max(targetX - 2, -2);
+            else targetX = Math.min(targetX + 2, 2);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (gameState !== 'PLAYING') {
+                renderer.render(scene, camera); return;
+            }
+
+            const deltaX = targetX - playerGroup.position.x;
+            playerGroup.position.x += deltaX * 0.1;
+            
+            if (playerGroup.children.length > 0) {
+                playerGroup.position.y = 1.5 + Math.sin(Date.now() * 0.015) * 0.1; 
+                playerGroup.rotation.z = deltaX * -0.15; 
+                playerGroup.rotation.y = deltaX * 0.1; 
+            }
+            floorTexture.offset.y += speed * 0.05;
+
+            // 烟尘
+            if (Math.random() > 0.7) spawnDust();
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.position.z += speed; 
+                p.scale.multiplyScalar(0.95);
+                p.material.opacity -= 0.03;
+                if (p.material.opacity <= 0) {
+                    scene.remove(p); particles.splice(i, 1);
+                }
+            }
+
+            // 爆炸粒子
+            for (let i = explosionParticles.length - 1; i >= 0; i--) {
+                const p = explosionParticles[i];
+                p.position.x += p.userData.velX;
+                p.position.y += p.userData.velY;
+                p.position.z += p.userData.velZ;
+                p.rotation.x += p.userData.rotVel;
+                p.userData.velY -= 0.01; 
+                p.scale.multiplyScalar(0.95);
+                if (p.scale.x < 0.01) {
+                    scene.remove(p); explosionParticles.splice(i, 1);
+                }
+            }
+
+            // 障碍物
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.position.z += speed;
+                obs.rotation.x += obs.userData.rotationSpeed;
+                if (checkCollision(playerGroup, obs)) {
+                    shakeIntensity = 0.5; // 触发震动
+                    gameOver();
+                }
+                if (obs.position.z > 5) {
+                    scene.remove(obs); obstacles.splice(i, 1);
+                    score++; document.getElementById('score-board').innerText = "SCORE: " + score;
+                }
+            }
+
+            // 金币
+            for (let i = coins.length - 1; i >= 0; i--) {
+                const coin = coins[i];
+                coin.position.z += speed;
+                coin.rotation.y += 0.05;
+                if (checkCollision(playerGroup, coin)) {
+                    triggerCoinExplosion(coin.position); // 触发特效
+                    showFloatingText("+10");
+                    scene.remove(coin); coins.splice(i, 1);
+                    score += 10; document.getElementById('score-board').innerText = "SCORE: " + score;
+                } else if (coin.position.z > 5) {
+                    scene.remove(coin); coins.splice(i, 1);
+                }
+            }
+
+            // 相机震动
+            if (shakeIntensity > 0) {
+                camera.position.x = originalCameraPos.x + (Math.random() - 0.5) * shakeIntensity;
+                camera.position.y = originalCameraPos.y + (Math.random() - 0.5) * shakeIntensity;
+                camera.position.z = originalCameraPos.z + (Math.random() - 0.5) * shakeIntensity;
+                shakeIntensity -= 0.05; 
+                if (shakeIntensity < 0) {
+                    shakeIntensity = 0; camera.position.copy(originalCameraPos);
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            document.getElementById('game-over').style.display = 'block';
+            let titleText = "乌萨奇翻车了!";
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('usagi_high_score', highScore); 
+                titleText = "🎉 新纪录诞生! 🎉"; 
+                document.getElementById('high-score-display').innerText = "🏆 历史最高分: " + highScore;
+            }
+            document.getElementById('game-over-title').innerText = titleText;
+            document.getElementById('final-score').innerText = "本次得分: " + score;
+            if (playerGroup.children.length > 0) playerGroup.children[0].rotation.x = -Math.PI / 2;
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        animate();
+    </script>
+</body>
+</html>
